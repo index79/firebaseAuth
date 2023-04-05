@@ -7,43 +7,72 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { auth } from "../firebase";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation } from "@react-navigation/core";
+// import { auth } from "../firebase";
+import firebase from "../firebase";
+import {
+  getAuth,
+  onAuthStateChanged,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+} from "firebase/auth";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const LoginScreen = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  const navigation = useNavigation;
+  // Initialize Firebase Authentication and get a reference to the service
+  const auth = getAuth(firebase);
+  const navigation = useNavigation();
 
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged((user) => {
+    loadUserInfo();
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
-        navigation.navigate("Home");
+        navigation.replace("Home");
       }
     });
     return unsubscribe;
   }, []);
 
-  const handleSignUp = () => {
-    auth
-      .createUserWithEmailAndPassword(email, password)
+  function handleSignUp() {
+    createUserWithEmailAndPassword(auth, email, password)
       .then((userCredentials) => {
         const user = userCredentials.user;
-        console.log(user.email);
+        saveCredentials(user);
+        console.log("Signed in with:", user.email);
       })
       .catch((error) => alert(error.message));
-  };
+  }
 
-  const handleLogin = () => {
-    auth
-      .signInWithEmailAndPassword(email, password)
-      .then((userCredentials) => {
+  async function handleLogin() {
+    signInWithEmailAndPassword(auth, email, password)
+      .then(async (userCredentials) => {
         const user = userCredentials.user;
+        saveCredentials(user);
         console.log("Logged in with:", user.email);
       })
       .catch((error) => alert(error.message));
-  };
+  }
+
+  async function saveCredentials() {
+    await AsyncStorage.setItem("userEmail", email);
+    await AsyncStorage.setItem("userPassword", password);
+  }
+
+  async function loadUserInfo() {
+    try {
+      const userEmail = await AsyncStorage.getItem("userEmail");
+      const userPassword = await AsyncStorage.getItem("userPassword");
+      if (userEmail !== null && userPassword !== null) {
+        setEmail(userEmail);
+        setPassword(userPassword);
+      }
+    } catch (error) {
+      console.log("Error loading user info: ", error);
+    }
+  }
 
   return (
     <KeyboardAvoidingView style={styles.container} behavior="padding">
@@ -72,6 +101,7 @@ const LoginScreen = () => {
         >
           <Text style={styles.buttonOutlineText}>Register</Text>
         </TouchableOpacity>
+        {/* <GoogleLogin onLoginSuccess={handleGoogleLogin} /> */}
       </View>
     </KeyboardAvoidingView>
   );
